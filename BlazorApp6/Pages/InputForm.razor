@@ -1,0 +1,96 @@
+﻿@page "/"
+@page "/input"
+
+@using Blazored.FluentValidation
+@using FluentValidation
+
+
+<EditForm EditContext="@editContext" OnValidSubmit="@HandleValidSubmit">
+    <FluentValidationValidator />
+    <div class="form-group">
+        <InputText id="firstName" @bind-Value="theModel.InputFirstName"/>
+        <ValidationMessage For="() => theModel.InputFirstName" />
+    </div>
+
+    <div class="form-group">
+        <InputText id="lastName" @bind-Value="theModel.InputLastName" />
+        <ValidationMessage For="() => theModel.InputLastName" />
+    </div>
+
+    <MudTextField @bind-Value="theModel.MudFirstName"
+                  For="@(() => theModel.MudFirstName)"
+                  Immediate="true"
+                  Label="Mud first name" />
+
+    <MudTextField @bind-Value="theModel.MudLastName"
+                  Validation="@(theValidator.ValidateValue)"
+                  For="@(() => theModel.MudLastName)"
+                  Immediate="true"
+                  Label="Mud last name" />
+    <p>
+        <label>
+            Form Is Modified: @isModified @fieldName
+        </label>
+    </p>
+
+    <button type="submit" disabled="@(!editContext!.Validate())">Submit</button>
+</EditForm>
+
+@code {
+    private TheModel theModel = new() { InputFirstName = "InputFirst", InputLastName = "InputLast", MudFirstName = "MudFirst", MudLastName = "MudLast" };
+    private TheModelValidator theValidator = new TheModelValidator();
+    private EditContext? editContext;
+    private bool isModified { get; set; }
+    private string fieldName { get; set; } = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        editContext = new(theModel);
+        editContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        if (editContext is not null)
+        {
+            isModified = editContext.IsModified();
+            fieldName = $" - by {e.FieldIdentifier.FieldName}";
+            StateHasChanged();
+        }
+    }
+
+    private void HandleValidSubmit()
+    {
+        Console.WriteLine("OnValidSubmit");
+    }
+
+    public class TheModel
+    {
+        public string InputFirstName { get; set; }
+
+        public string InputLastName { get; set; }
+
+        public string MudFirstName { get; set; }
+
+        public string MudLastName { get; set; }
+    }
+
+    public class TheModelValidator : AbstractValidator<TheModel>
+    {
+        public TheModelValidator()
+        {
+            RuleFor(x => x.InputFirstName).NotEmpty().WithMessage("Please specify an input first name");
+            RuleFor(x => x.InputLastName).NotEmpty().WithMessage("Please specify an input last name");
+            RuleFor(x => x.MudFirstName).NotEmpty().WithMessage("Please specify a mud first name");
+            RuleFor(x => x.MudLastName).NotEmpty().WithMessage("Please specify a mud last name");
+        }
+        public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
+        {
+            var result = await ValidateAsync(ValidationContext<TheModel>.CreateWithOptions((TheModel)model, x => x.IncludeProperties(propertyName)));
+            if (result.IsValid)
+                return Array.Empty<string>();
+            return result.Errors.Select(e => e.ErrorMessage);
+        };
+    }
+
+}
